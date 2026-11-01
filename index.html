@@ -38,6 +38,18 @@
     <div id="root"></div>
 
     <script type="text/babel">
+        // ----------------------------------------------------
+        // DEFAULT FIREBASE CONFIGURATION
+        // ఇక్కడ మీ ఫైర్‌బేస్ డేటాబేస్ URL మరియు API Key వేయండి
+        // ----------------------------------------------------
+        const DEFAULT_FIREBASE_CONFIG = {
+            apiKey: "YOUR_API_KEY_HERE",
+            authDomain: "",
+            databaseURL: "https://YOUR_DATABASE_NAME.firebaseio.com",
+            projectId: "",
+            appId: ""
+        };
+
         function App() {
             const [view, setView] = React.useState('home'); 
             const [mobile, setMobile] = React.useState('');
@@ -45,10 +57,10 @@
             const [mobileError, setMobileError] = React.useState('');
             const [secretInput, setSecretInput] = React.useState('');
             
-            // Firebase Configuration State
+            // Firebase Configuration State - Defaulting to fallback credentials
             const [firebaseConfig, setFirebaseConfig] = React.useState(() => {
                 const saved = localStorage.getItem('loyalty_firebase_config');
-                return saved ? JSON.parse(saved) : { apiKey: "", authDomain: "", databaseURL: "", projectId: "", appId: "" };
+                return saved ? JSON.parse(saved) : DEFAULT_FIREBASE_CONFIG;
             });
             const [fbDB, setFbDB] = React.useState(null);
 
@@ -417,7 +429,6 @@
                                                     required
                                                 />
                                             </div>
-                                            {/* Red Text Error for invalid mobile number starting digit */}
                                             {mobileError && (
                                                 <span className="text-red-600 text-[11px] font-bold block pt-1">
                                                     {mobileError}
