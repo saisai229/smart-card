@@ -99,10 +99,17 @@
             };
 
             const resetCard = (mob) => {
-                setCustomers(prev => ({
-                    ...prev,
-                    [mob]: { ...prev[mob], stamps: 0, history: [...prev[mob].history, { date: new Date().toLocaleString(), delta: 'Reset' }] }
-                }));
+                setCustomers(prev => {
+                    const updated = { ...prev };
+                    if (updated[mob]) {
+                        updated[mob] = { 
+                            ...updated[mob], 
+                            stamps: 0, 
+                            history: [...updated[mob].history, { date: new Date().toLocaleString(), delta: 'Reset' }] 
+                        };
+                    }
+                    return updated;
+                });
             };
 
             const deleteCustomer = (mob) => {
@@ -180,11 +187,7 @@
                             <div className="max-w-5xl w-full grid grid-cols-1 md:grid-cols-2 bg-white rounded-2xl shadow-xl overflow-hidden border border-stone-200">
                                 <div className="relative bg-stone-900 min-h-[300px] md:min-h-[500px] bg-cover bg-center flex flex-col justify-between p-8 text-white" style={{ backgroundImage: `url(${config.heroBgUrl})` }}>
                                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
-                                    <div className="relative z-10 flex items-center space-x-3">
-                                        <img src={config.logoUrl} alt="Logo" className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-md"/>
-                                        <span className="font-bold text-lg tracking-wide">{config.brandName}</span>
-                                    </div>
-                                    <div className="relative z-10 space-y-3">
+                                    <div className="relative z-10 space-y-3 mt-auto">
                                         <div className="inline-block bg-orange-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow">
                                             {config.heroBadgeText}
                                         </div>
