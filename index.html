@@ -39,13 +39,12 @@
 
     <script type="text/babel">
         // ----------------------------------------------------
-        // DEFAULT FIREBASE CONFIGURATION
-        // Insert your Firebase Database URL and API Key here
+        // FIXED FIREBASE CONFIGURATION
         // ----------------------------------------------------
         const DEFAULT_FIREBASE_CONFIG = {
-            apiKey: "YOUR_API_KEY_HERE",
+            apiKey: "AIzaSyDY4sGDblR_KBIMTIEZuAerWlLXAn5nZ6I",
             authDomain: "",
-            databaseURL: "https://YOUR_DATABASE_NAME.firebaseio.com",
+            databaseURL: "https://smart-card-bd058-default-rtdb.firebaseio.com",
             projectId: "",
             appId: ""
         };
@@ -57,11 +56,8 @@
             const [mobileError, setMobileError] = React.useState('');
             const [secretInput, setSecretInput] = React.useState('');
             
-            // Firebase Configuration State - Defaulting to fallback credentials
-            const [firebaseConfig, setFirebaseConfig] = React.useState(() => {
-                const saved = localStorage.getItem('loyalty_firebase_config');
-                return saved ? JSON.parse(saved) : DEFAULT_FIREBASE_CONFIG;
-            });
+            // Firebase Configuration State - Defaulting to fixed credentials
+            const [firebaseConfig, setFirebaseConfig] = React.useState(DEFAULT_FIREBASE_CONFIG);
             const [fbDB, setFbDB] = React.useState(null);
 
             // Persisted Admin Passcode (Default: 9985656800)
@@ -99,7 +95,7 @@
 
             const [searchTerm, setSearchTerm] = React.useState('');
 
-            // Initialize Firebase App & Realtime Sync Listener
+            // Initialize Firebase App & Realtime Sync Listener immediately
             React.useEffect(() => {
                 if (firebaseConfig && firebaseConfig.databaseURL && window.firebase) {
                     try {
@@ -109,7 +105,7 @@
                         const db = firebase.database();
                         setFbDB(db);
 
-                        // Listen to real-time changes across all devices
+                        // Listen to real-time changes across all devices instantly
                         const custRef = db.ref('customers');
                         custRef.on('value', (snapshot) => {
                             const val = snapshot.val();
@@ -138,7 +134,7 @@
                 }
             }, [firebaseConfig]);
 
-            // Sync updates to Firebase Cloud if initialized, fallback to LocalStorage
+            // Sync updates to Firebase Cloud instantly
             const syncCustomersData = (updatedCustomers) => {
                 setCustomers(updatedCustomers);
                 localStorage.setItem('loyalty_customers', JSON.stringify(updatedCustomers));
@@ -155,7 +151,6 @@
                 }
             };
 
-            // Save Admin PIN change to local storage
             React.useEffect(() => {
                 localStorage.setItem('loyalty_admin_pin', adminPinConfig);
             }, [adminPinConfig]);
@@ -252,13 +247,6 @@
                 }
             };
 
-            const handleSaveFirebase = (e) => {
-                e.preventDefault();
-                localStorage.setItem('loyalty_firebase_config', JSON.stringify(firebaseConfig));
-                showToast('Firebase Realtime Database updated!', 'success');
-                setTimeout(() => window.location.reload(), 1000);
-            };
-
             const handleUpdateAdminPassword = (e) => {
                 e.preventDefault();
                 if (currentAdminPassword !== adminPinConfig) {
@@ -288,7 +276,6 @@
                 }
             };
 
-            // Shared Customer Item Component for Admin & Master Panels
             const renderCustomerList = () => (
                 <div className="space-y-3 max-h-64 overflow-y-auto custom-scrollbar pr-1">
                     {Object.keys(customers).length === 0 ? (
@@ -322,7 +309,6 @@
                 </div>
             );
 
-            // Shared Change Admin Password Component
             const renderChangeAdminPasswordForm = () => (
                 <div className="border-t border-stone-200 pt-4 space-y-3">
                     <h3 className="text-xs font-bold uppercase tracking-wider text-stone-600">Change Admin Password</h3>
@@ -354,7 +340,6 @@
 
             return (
                 <div className="min-h-screen flex flex-col justify-between bg-stone-100">
-                    {/* Header Bar */}
                     <header className="bg-white border-b border-stone-200 px-6 py-3.5 flex justify-between items-center shadow-sm sticky top-0 z-20">
                         <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setView('home')}>
                             <img src={config.logoUrl} alt="Logo" className="w-9 h-9 rounded-full object-cover border border-stone-200 shadow-sm"/>
@@ -374,7 +359,6 @@
                         </div>
                     </header>
 
-                    {/* Toast Notification */}
                     {toastMessage && (
                         <div className={`fixed top-16 right-4 z-50 px-4 py-3 rounded-xl shadow-lg text-white text-xs font-bold transition-all ${
                             toastType === 'error' ? 'bg-red-600' : toastType === 'success' ? 'bg-emerald-600' : 'bg-stone-800'
@@ -383,13 +367,9 @@
                         </div>
                     )}
 
-                    {/* Main Content Area */}
                     <main className="flex-grow flex items-center justify-center p-4">
-                        
-                        {/* VIEW 1: HOME PAGE */}
                         {view === 'home' && (
                             <div className="max-w-4xl w-full grid grid-cols-1 md:grid-cols-2 bg-white rounded-3xl shadow-xl overflow-hidden border border-stone-200">
-                                {/* Hero Card Side */}
                                 <div className="relative bg-stone-900 min-h-[280px] md:min-h-[460px] bg-cover bg-center flex flex-col justify-between p-8 text-white" style={{ backgroundImage: `url(${config.heroBgUrl})` }}>
                                     <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-black/20"></div>
                                     <div className="relative z-10 space-y-3 mt-auto">
@@ -401,7 +381,6 @@
                                     </div>
                                 </div>
 
-                                {/* Login Form Side */}
                                 <div className="p-8 md:p-10 flex flex-col justify-center space-y-6 bg-white">
                                     <div className="space-y-1.5">
                                         <h2 className="text-2xl font-bold text-stone-900">Welcome Back</h2>
@@ -429,7 +408,6 @@
                                                     required
                                                 />
                                             </div>
-                                            {/* Red Text Error for invalid mobile number starting digit */}
                                             {mobileError && (
                                                 <span className="text-red-600 text-[11px] font-bold block pt-1">
                                                     {mobileError}
@@ -463,7 +441,6 @@
                             </div>
                         )}
 
-                        {/* VIEW 2: LOGIN MODAL FOR ADMIN / MASTER */}
                         {view === 'loginModal' && (
                             <div className="max-w-md w-full bg-white p-8 rounded-3xl shadow-xl space-y-5 border border-stone-200">
                                 <div className="flex justify-between items-center border-b pb-3">
@@ -488,7 +465,6 @@
                             </div>
                         )}
 
-                        {/* VIEW 3: USER DASHBOARD (CARD VIEW) */}
                         {view === 'userDashboard' && customers[mobile] && (
                             <div className="max-w-md w-full bg-white rounded-3xl shadow-xl overflow-hidden border border-stone-200">
                                 <div className="bg-gradient-to-r from-orange-600 to-amber-600 text-white p-6 relative">
@@ -502,7 +478,6 @@
                                         </button>
                                     </div>
 
-                                    {/* Progress Status */}
                                     <div className="space-y-2 mt-4">
                                         <div className="flex justify-between text-xs font-bold">
                                             <span>{customers[mobile].stamps} / 10 stamps collected</span>
@@ -521,7 +496,6 @@
                                     </div>
                                 </div>
 
-                                {/* 10 Stamp Grid */}
                                 <div className="p-6 space-y-6 bg-white">
                                     <div className="grid grid-cols-5 gap-3">
                                         {[...Array(10)].map((_, idx) => {
@@ -548,7 +522,6 @@
                             </div>
                         )}
 
-                        {/* VIEW 4: ADMIN PANEL */}
                         {view === 'adminPanel' && (
                             <div className="max-w-lg w-full bg-white p-6 md:p-8 rounded-3xl shadow-xl space-y-5 border border-stone-200">
                                 <div className="flex justify-between items-center border-b pb-3">
@@ -564,15 +537,11 @@
                                     className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-orange-500"
                                 />
 
-                                {/* Customer list with 🔑 PIN and controls */}
                                 {renderCustomerList()}
-
-                                {/* Change Admin Password Section */}
                                 {renderChangeAdminPasswordForm()}
                             </div>
                         )}
 
-                        {/* VIEW 5: MASTER PANEL */}
                         {view === 'masterPanel' && (
                             <div className="max-w-xl w-full bg-white p-6 md:p-8 rounded-3xl shadow-xl space-y-6 border border-stone-200">
                                 <div className="flex justify-between items-center border-b pb-3">
@@ -588,10 +557,8 @@
                                     className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-orange-500"
                                 />
                                 
-                                {/* Customer list with 🔑 PIN and controls */}
                                 {renderCustomerList()}
 
-                                {/* Full Branding & Content Customization */}
                                 <div className="space-y-3 max-h-96 overflow-y-auto custom-scrollbar pr-1 border-t pt-4">
                                     <h3 className="text-xs font-bold uppercase tracking-wider text-stone-600">Content & Image Customization</h3>
                                     
@@ -637,40 +604,11 @@
                                     </div>
                                 </div>
 
-                                {/* Firebase Cloud Sync Integration Settings */}
-                                <div className="border-t border-stone-200 pt-4 space-y-3">
-                                    <h3 className="text-xs font-bold uppercase tracking-wider text-orange-600">🔥 Live Cloud Sync (Firebase Settings)</h3>
-                                    <p className="text-[11px] text-stone-500">
-                                        Enter Firebase Realtime Database details below to enable live instant updates across all different customer phones:
-                                    </p>
-                                    <form onSubmit={handleSaveFirebase} className="space-y-2">
-                                        <input 
-                                            type="text" 
-                                            placeholder="Database URL (e.g. https://my-app.firebaseio.com)" 
-                                            value={firebaseConfig.databaseURL} 
-                                            onChange={(e) => setFirebaseConfig({...firebaseConfig, databaseURL: e.target.value})}
-                                            className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs font-mono"
-                                        />
-                                        <input 
-                                            type="text" 
-                                            placeholder="API Key" 
-                                            value={firebaseConfig.apiKey} 
-                                            onChange={(e) => setFirebaseConfig({...firebaseConfig, apiKey: e.target.value})}
-                                            className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs font-mono"
-                                        />
-                                        <button type="submit" className="w-full bg-orange-600 hover:bg-orange-700 text-white p-2.5 rounded-xl text-xs font-bold transition">
-                                            Save Firebase Sync Config
-                                        </button>
-                                    </form>
-                                </div>
-
-                                {/* Change Admin Password Section */}
                                 {renderChangeAdminPasswordForm()}
                             </div>
                         )}
                     </main>
 
-                    {/* Footer */}
                     <footer className="text-center p-4 text-xs font-medium text-stone-400 border-t border-stone-200 bg-white">
                         {config.footerText}
                     </footer>
