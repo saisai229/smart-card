@@ -40,7 +40,7 @@
     <script type="text/babel">
         // ----------------------------------------------------
         // DEFAULT FIREBASE CONFIGURATION
-        // ఇక్కడ మీ ఫైర్‌బేస్ డేటాబేస్ URL మరియు API Key వేయండి
+        // Insert your Firebase Database URL and API Key here
         // ----------------------------------------------------
         const DEFAULT_FIREBASE_CONFIG = {
             apiKey: "YOUR_API_KEY_HERE",
@@ -429,6 +429,7 @@
                                                     required
                                                 />
                                             </div>
+                                            {/* Red Text Error for invalid mobile number starting digit */}
                                             {mobileError && (
                                                 <span className="text-red-600 text-[11px] font-bold block pt-1">
                                                     {mobileError}
