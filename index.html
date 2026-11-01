@@ -13,6 +13,9 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Firebase SDKs for Realtime Database Synchronization -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
         body {
@@ -42,6 +45,13 @@
             const [mobileError, setMobileError] = React.useState('');
             const [secretInput, setSecretInput] = React.useState('');
             
+            // Firebase Configuration State
+            const [firebaseConfig, setFirebaseConfig] = React.useState(() => {
+                const saved = localStorage.getItem('loyalty_firebase_config');
+                return saved ? JSON.parse(saved) : { apiKey: "", authDomain: "", databaseURL: "", projectId: "", appId: "" };
+            });
+            const [fbDB, setFbDB] = React.useState(null);
+
             // Persisted Admin Passcode (Default: 9985656800)
             const [adminPinConfig, setAdminPinConfig] = React.useState(() => {
                 return localStorage.getItem('loyalty_admin_pin') || '9985656800';
@@ -50,7 +60,7 @@
             const [currentAdminPassword, setCurrentAdminPassword] = React.useState('');
             const [newAdminPassword, setNewAdminPassword] = React.useState('');
             const [toastMessage, setToastMessage] = React.useState('');
-            const [toastType, setToastType] = React.useState('info'); // info, success, error
+            const [toastType, setToastType] = React.useState('info');
 
             // Master & Branding Config Persistence
             const [config, setConfig] = React.useState(() => {
@@ -77,52 +87,66 @@
 
             const [searchTerm, setSearchTerm] = React.useState('');
 
+            // Initialize Firebase App & Realtime Sync Listener
+            React.useEffect(() => {
+                if (firebaseConfig && firebaseConfig.databaseURL && window.firebase) {
+                    try {
+                        if (!firebase.apps.length) {
+                            firebase.initializeApp(firebaseConfig);
+                        }
+                        const db = firebase.database();
+                        setFbDB(db);
+
+                        // Listen to real-time changes across all devices
+                        const custRef = db.ref('customers');
+                        custRef.on('value', (snapshot) => {
+                            const val = snapshot.val();
+                            if (val) {
+                                setCustomers(val);
+                                localStorage.setItem('loyalty_customers', JSON.stringify(val));
+                            }
+                        });
+
+                        const confRef = db.ref('master_config');
+                        confRef.on('value', (snapshot) => {
+                            const val = snapshot.val();
+                            if (val) {
+                                setConfig(val);
+                                localStorage.setItem('loyalty_master_config', JSON.stringify(val));
+                            }
+                        });
+
+                        return () => {
+                            custRef.off();
+                            confRef.off();
+                        };
+                    } catch (err) {
+                        console.error("Firebase init error:", err);
+                    }
+                }
+            }, [firebaseConfig]);
+
+            // Sync updates to Firebase Cloud if initialized, fallback to LocalStorage
+            const syncCustomersData = (updatedCustomers) => {
+                setCustomers(updatedCustomers);
+                localStorage.setItem('loyalty_customers', JSON.stringify(updatedCustomers));
+                if (fbDB) {
+                    fbDB.ref('customers').set(updatedCustomers);
+                }
+            };
+
+            const syncMasterConfig = (updatedConfig) => {
+                setConfig(updatedConfig);
+                localStorage.setItem('loyalty_master_config', JSON.stringify(updatedConfig));
+                if (fbDB) {
+                    fbDB.ref('master_config').set(updatedConfig);
+                }
+            };
+
             // Save Admin PIN change to local storage
             React.useEffect(() => {
                 localStorage.setItem('loyalty_admin_pin', adminPinConfig);
             }, [adminPinConfig]);
-
-            // Save Master Config to local storage
-            React.useEffect(() => {
-                localStorage.setItem('loyalty_master_config', JSON.stringify(config));
-            }, [config]);
-
-            // Save Customers Data to local storage
-            React.useEffect(() => {
-                localStorage.setItem('loyalty_customers', JSON.stringify(customers));
-            }, [customers]);
-
-            // Listen for cross-tab or real-time storage updates
-            React.useEffect(() => {
-                const handleStorageChange = (e) => {
-                    if (e.key === 'loyalty_customers' && e.newValue) {
-                        setCustomers(JSON.parse(e.newValue));
-                    }
-                    if (e.key === 'loyalty_master_config' && e.newValue) {
-                        setConfig(JSON.parse(e.newValue));
-                    }
-                };
-                window.addEventListener('storage', handleStorageChange);
-
-                // Auto-sync interval to reflect changes instantly on the same browser window
-                const interval = setInterval(() => {
-                    const savedCustomers = localStorage.getItem('loyalty_customers');
-                    if (savedCustomers) {
-                        const parsed = JSON.parse(savedCustomers);
-                        setCustomers(prev => JSON.stringify(prev) !== savedCustomers ? parsed : prev);
-                    }
-                    const savedConfig = localStorage.getItem('loyalty_master_config');
-                    if (savedConfig) {
-                        const parsedConfig = JSON.parse(savedConfig);
-                        setConfig(prev => JSON.stringify(prev) !== savedConfig ? parsedConfig : prev);
-                    }
-                }, 500);
-
-                return () => {
-                    window.removeEventListener('storage', handleStorageChange);
-                    clearInterval(interval);
-                };
-            }, []);
 
             const showToast = (msg, type = 'info') => {
                 setToastMessage(msg);
@@ -130,7 +154,6 @@
                 setTimeout(() => setToastMessage(''), 3000);
             };
 
-            // Mobile Validation: Must be 10 digits starting with 6, 7, 8, or 9
             const validateMobile = (num) => {
                 const regex = /^[6-9]\d{9}$/;
                 return regex.test(num);
@@ -149,11 +172,11 @@
                 setMobileError('');
                 
                 if (!customers[mobile]) {
-                    // Create new customer permanently
-                    setCustomers(prev => ({
-                        ...prev,
+                    const newCust = {
+                        ...customers,
                         [mobile]: { pin: pin, stamps: 0, history: [] }
-                    }));
+                    };
+                    syncCustomersData(newCust);
                     showToast('New Loyalty Card registered successfully!', 'success');
                 } else if (customers[mobile].pin !== pin) {
                     showToast('Incorrect PIN! Please try again.', 'error');
@@ -164,45 +187,41 @@
                 setView('userDashboard');
             };
 
-            // Immediate Stamp Update logic
+            // Immediate Realtime Stamp Update logic
             const updateStamps = (mob, delta) => {
-                setCustomers(prev => {
-                    const current = prev[mob] || { pin: '1234', stamps: 0, history: [] };
-                    const newStamps = Math.max(0, Math.min(10, current.stamps + delta));
-                    const updated = {
-                        ...prev,
-                        [mob]: {
-                            ...current,
-                            stamps: newStamps,
-                            history: [...current.history, { date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), delta: delta > 0 ? `+${delta}` : `${delta}` }]
-                        }
-                    };
-                    return updated;
-                });
+                const current = customers[mob] || { pin: '1234', stamps: 0, history: [] };
+                const newStamps = Math.max(0, Math.min(10, current.stamps + delta));
+                const updated = {
+                    ...customers,
+                    [mob]: {
+                        ...current,
+                        stamps: newStamps,
+                        history: [...(current.history || []), { date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), delta: delta > 0 ? `+${delta}` : `${delta}` }]
+                    }
+                };
+                syncCustomersData(updated);
                 showToast(`Stamps updated for ${mob}`, 'success');
             };
 
             const resetCard = (mob) => {
-                setCustomers(prev => {
-                    const updated = { ...prev };
-                    if (updated[mob]) {
-                        updated[mob] = { 
-                            ...updated[mob], 
+                if (customers[mob]) {
+                    const updated = {
+                        ...customers,
+                        [mob]: { 
+                            ...customers[mob], 
                             stamps: 0, 
-                            history: [...updated[mob].history, { date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), delta: 'Reset' }] 
-                        };
-                    }
-                    return updated;
-                });
-                showToast(`Stamps reset to 0 for ${mob}`, 'info');
+                            history: [...(customers[mob].history || []), { date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), delta: 'Reset' }] 
+                        }
+                    };
+                    syncCustomersData(updated);
+                    showToast(`Stamps reset to 0 for ${mob}`, 'info');
+                }
             };
 
             const deleteCustomer = (mob) => {
-                setCustomers(prev => {
-                    const updated = { ...prev };
-                    delete updated[mob];
-                    return updated;
-                });
+                const updated = { ...customers };
+                delete updated[mob];
+                syncCustomersData(updated);
                 showToast(`Customer ${mob} permanently deleted.`, 'error');
             };
 
@@ -219,6 +238,13 @@
                 } else {
                     showToast('Incorrect passcode!', 'error');
                 }
+            };
+
+            const handleSaveFirebase = (e) => {
+                e.preventDefault();
+                localStorage.setItem('loyalty_firebase_config', JSON.stringify(firebaseConfig));
+                showToast('Firebase Realtime Database updated!', 'success');
+                setTimeout(() => window.location.reload(), 1000);
             };
 
             const handleUpdateAdminPassword = (e) => {
@@ -242,7 +268,8 @@
                 if (file) {
                     const reader = new FileReader();
                     reader.onloadend = () => {
-                        setConfig(prev => ({ ...prev, [key]: reader.result }));
+                        const updated = { ...config, [key]: reader.result };
+                        syncMasterConfig(updated);
                         showToast('Image uploaded successfully!', 'success');
                     };
                     reader.readAsDataURL(file);
@@ -558,7 +585,7 @@
                                     
                                     <div>
                                         <label className="text-xs font-semibold text-stone-600">Brand Name</label>
-                                        <input type="text" value={config.brandName} onChange={(e) => setConfig({...config, brandName: e.target.value})} className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs font-medium"/>
+                                        <input type="text" value={config.brandName} onChange={(e) => syncMasterConfig({...config, brandName: e.target.value})} className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs font-medium"/>
                                     </div>
                                     <div>
                                         <label className="text-xs font-semibold text-stone-600">Upload New Logo (From Gallery)</label>
@@ -566,19 +593,19 @@
                                     </div>
                                     <div>
                                         <label className="text-xs font-semibold text-stone-600">Card Description</label>
-                                        <input type="text" value={config.cardDescription} onChange={(e) => setConfig({...config, cardDescription: e.target.value})} className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs font-medium"/>
+                                        <input type="text" value={config.cardDescription} onChange={(e) => syncMasterConfig({...config, cardDescription: e.target.value})} className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs font-medium"/>
                                     </div>
                                     <div>
                                         <label className="text-xs font-semibold text-stone-600">Hero Title</label>
-                                        <input type="text" value={config.heroTitle} onChange={(e) => setConfig({...config, heroTitle: e.target.value})} className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs font-medium"/>
+                                        <input type="text" value={config.heroTitle} onChange={(e) => syncMasterConfig({...config, heroTitle: e.target.value})} className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs font-medium"/>
                                     </div>
                                     <div>
                                         <label className="text-xs font-semibold text-stone-600">Hero Subtitle</label>
-                                        <input type="text" value={config.heroSubtitle} onChange={(e) => setConfig({...config, heroSubtitle: e.target.value})} className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs font-medium"/>
+                                        <input type="text" value={config.heroSubtitle} onChange={(e) => syncMasterConfig({...config, heroSubtitle: e.target.value})} className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs font-medium"/>
                                     </div>
                                     <div>
                                         <label className="text-xs font-semibold text-stone-600">Hero Badge Text</label>
-                                        <input type="text" value={config.heroBadgeText} onChange={(e) => setConfig({...config, heroBadgeText: e.target.value})} className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs font-medium"/>
+                                        <input type="text" value={config.heroBadgeText} onChange={(e) => syncMasterConfig({...config, heroBadgeText: e.target.value})} className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs font-medium"/>
                                     </div>
                                     <div>
                                         <label className="text-xs font-semibold text-stone-600">Upload New Hero Background (From Gallery)</label>
@@ -586,16 +613,43 @@
                                     </div>
                                     <div>
                                         <label className="text-xs font-semibold text-stone-600">Footer Text</label>
-                                        <input type="text" value={config.footerText} onChange={(e) => setConfig({...config, footerText: e.target.value})} className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs font-medium"/>
+                                        <input type="text" value={config.footerText} onChange={(e) => syncMasterConfig({...config, footerText: e.target.value})} className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs font-medium"/>
                                     </div>
                                     <div>
                                         <label className="text-xs font-semibold text-stone-600">Stamp Icon</label>
-                                        <input type="text" value={config.stampIcon || '★'} onChange={(e) => setConfig({...config, stampIcon: e.target.value})} className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs font-medium"/>
+                                        <input type="text" value={config.stampIcon || '★'} onChange={(e) => syncMasterConfig({...config, stampIcon: e.target.value})} className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs font-medium"/>
                                     </div>
                                     <div>
                                         <label className="text-xs font-semibold text-stone-600">Reward Icon</label>
-                                        <input type="text" value={config.rewardIcon || '🎁'} onChange={(e) => setConfig({...config, rewardIcon: e.target.value})} className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs font-medium"/>
+                                        <input type="text" value={config.rewardIcon || '🎁'} onChange={(e) => syncMasterConfig({...config, rewardIcon: e.target.value})} className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs font-medium"/>
                                     </div>
+                                </div>
+
+                                {/* Firebase Cloud Sync Integration Settings */}
+                                <div className="border-t border-stone-200 pt-4 space-y-3">
+                                    <h3 className="text-xs font-bold uppercase tracking-wider text-orange-600">🔥 Live Cloud Sync (Firebase Settings)</h3>
+                                    <p className="text-[11px] text-stone-500">
+                                        Enter Firebase Realtime Database details below to enable live instant updates across all different customer phones:
+                                    </p>
+                                    <form onSubmit={handleSaveFirebase} className="space-y-2">
+                                        <input 
+                                            type="text" 
+                                            placeholder="Database URL (e.g. https://my-app.firebaseio.com)" 
+                                            value={firebaseConfig.databaseURL} 
+                                            onChange={(e) => setFirebaseConfig({...firebaseConfig, databaseURL: e.target.value})}
+                                            className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs font-mono"
+                                        />
+                                        <input 
+                                            type="text" 
+                                            placeholder="API Key" 
+                                            value={firebaseConfig.apiKey} 
+                                            onChange={(e) => setFirebaseConfig({...firebaseConfig, apiKey: e.target.value})}
+                                            className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs font-mono"
+                                        />
+                                        <button type="submit" className="w-full bg-orange-600 hover:bg-orange-700 text-white p-2.5 rounded-xl text-xs font-bold transition">
+                                            Save Firebase Sync Config
+                                        </button>
+                                    </form>
                                 </div>
 
                                 {/* Change Admin Password Section */}
